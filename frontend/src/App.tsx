@@ -53,9 +53,12 @@ export default function App() {
       setMessages([newMsg("bot", data.question.text)]);
       setCurrentQuestion(data.question);
       setPhase("chatting");
-    } catch {
+    } catch (err) {
+      const isTimeout = err instanceof Error && err.message === "timeout";
       setErrorMsg(
-        "לא ניתן להתחבר לשרת. ודא שהשרת רץ על פורט 8000."
+        isTimeout
+          ? "השרת מתעורר (זה יכול לקחת עד דקה בפעם הראשונה). נסה שוב בעוד רגע."
+          : "לא ניתן להתחבר לשרת. ודא שהשרת פעיל ונסה שוב."
       );
       setPhase("error");
     }
@@ -160,7 +163,10 @@ export default function App() {
       {/* ─── Loading transition ─── */}
       {phase === "loading" && (
         <main className="flex-1 w-full max-w-xl px-4 flex items-center justify-center z-10">
-          <p className="text-gray-600 text-base">מתחבר…</p>
+          <p className="text-gray-600 text-base text-center leading-relaxed px-4">
+            מתחבר לשרת…<br />
+            <span className="text-sm text-gray-500">אם השרת היה לא פעיל, זה יכול לקחת עד דקה</span>
+          </p>
         </main>
       )}
 

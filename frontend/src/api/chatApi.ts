@@ -25,11 +25,27 @@ export interface NextQuestionResponse {
 export type AnswerResponse = NextQuestionResponse | ChatResult;
 
 const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const API_TIMEOUT_MS = 90_000;
 
 async function apiFetch(path: string, init?: RequestInit) {
-  const res = await fetch(`${API_BASE}${path}`, init);
-  if (!res.ok) throw new Error(`Server error: ${res.status}`);
-  return res;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    return res;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("timeout");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // ---------------------------------------------------------------------------
