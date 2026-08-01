@@ -81,6 +81,35 @@ _FEMALE_REPLACEMENTS = [
     ("בן/בת כמה", "בת כמה"),
 ]
 
+# When a parent question is answered negatively, skip dependent follow-ups
+# and inject neutral defaults so symptom mapping stays consistent.
+_SKIP_RULES: dict[str, dict[object, dict[str, object]]] = {
+    "vomiting": {
+        False: {"vomiting_times": "once", "blood_in_vomit": False},
+    },
+    "fever": {
+        False: {"fever_range": "mild"},
+    },
+    "swelling": {
+        False: {"swelling_location": ""},
+    },
+    "unusual_scratching_or_licking": {
+        False: {"scratching_location": ""},
+    },
+    "bleeding_now": {
+        False: {"bleeding_not_stopping": False},
+    },
+    "accident_fall_hit": {
+        False: {"walking_after_trauma": "yes"},
+    },
+}
+
+
+def _get_auto_skips(question_id: str, answer) -> dict[str, object]:
+    """Return follow-up answers to inject when a parent answer makes them irrelevant."""
+    rules = _SKIP_RULES.get(question_id, {})
+    return dict(rules.get(answer, {}))
+
 
 # ---------------------------------------------------------------------------
 # Internal: compute the next unanswered question
@@ -263,16 +292,10 @@ def answer_question(session_id: str, answer) -> dict:
     # Temporarily store the answer to compute next question
     answers_snapshot = {**session["answers"], current_q_id: answer}
 
-    # Skip logic: auto-inject minimum answers for dependent follow-up questions
-    auto_skips = {}
-    if current_q_id == "vomiting" and answer is False:
-        auto_skips["vomiting_times"] = "once"
-        auto_skips["blood_in_vomit"] = False
-        answers_snapshot["vomiting_times"] = "once"
-        answers_snapshot["blood_in_vomit"] = False
-    if current_q_id == "fever" and answer is False:
-        auto_skips["fever_range"] = "mild"
-        answers_snapshot["fever_range"] = "mild"
+    # Skip logic: auto-inject neutral answers for dependent follow-up questions
+    auto_skips = _get_auto_skips(current_q_id, answer)
+    for skipped_id, skipped_val in auto_skips.items():
+        answers_snapshot[skipped_id] = skipped_val
 
     next_q = _get_next_question(answers_snapshot)
     next_q_id = next_q["id"] if next_q else None
